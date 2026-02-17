@@ -1,31 +1,72 @@
-# Definimos la clase Inventario que gestiona los productos
+# Definir la clase Inventario que gestiona los productos
 # Esta clase maneja todas las operaciones del inventario.
-# Permite agregar, eliminar, buscar y actualizar productos.
+# MODIFICACION: Ahora guarda y carga productos desde un archivo.
 
 from modelos.producto import Producto
+from servicios.gestor_archivos import GestorArchivos
 
 
 class Inventario:
     """
-    Gestiona el inventario de productos.
+    Clase que gestiona el inventario de productos.
     
     Encargada de:
     - Almacenar una lista de productos
-    - Agregar nuevos productos
-    - Eliminar productos
+    - Agregar nuevos productos y guardarlos en archivo
+    - Eliminar productos y actualizar el archivo
     - Buscar productos
     - Actualizar informacion de productos
+    
+    CAMBIO: Ahora persiste los datos en un archivo (inventario.txt)
     """
     
     def __init__(self):
         """
         Constructor de la clase Inventario.
         
-        Inicializa una lista vacia para almacenar los productos.
+        Inicializa una lista vacia para almacenar productos.
+        CAMBIO: Crea un GestorArchivos para manejo de archivos.
         """
         # Lista privada que almacena todos los productos
-        # Es una lista vacia al principio
         self._productos = []
+        
+        # CAMBIO: Crear gestor de archivos para persistencia de datos
+        self._gestor = GestorArchivos("inventario.txt")
+        
+        # CAMBIO: Cargar productos existentes del archivo
+        self._cargar_productos_del_archivo()
+    
+    
+    def _cargar_productos_del_archivo(self):
+        """
+        Metodo PRIVADO que carga los productos desde el archivo al iniciar.
+        
+        Este metodo se llama automaticamente en el constructor.
+        Si el archivo no existe, simplemente comienza con lista vacia.
+        """
+        # Llamar al gestor para cargar productos
+        productos_cargados = self._gestor.cargar_productos()
+        
+        # Asignar los productos cargados a nuestra lista
+        self._productos = productos_cargados
+    
+    
+    def _guardar_en_archivo(self):
+        """
+        Metodo PRIVADO que guarda los productos en el archivo.
+        
+        Se llama automaticamente cada vez que agregamos, eliminamos o
+        actualizamos un producto.
+        """
+        # Llamar al gestor para guardar productos
+        exito = self._gestor.guardar_productos(self._productos)
+        
+        if exito:
+            # Si se guardo correctamente, retorna True
+            return True
+        else:
+            # Si hubo error, retorna False
+            return False
     
     
     def agregar_producto(self, id_producto, nombre, cantidad, precio):
@@ -33,7 +74,7 @@ class Inventario:
         Metodo para agregar un nuevo producto al inventario.
         
         VALIDACION: Verifica que el ID no este repetido.
-        Si el ID ya existe, muestra error y no agrega el producto.
+        CAMBIO: Guarda el producto en el archivo automaticamente.
         
         Parametros:
         - id_producto: ID unico del producto (integer)
@@ -44,48 +85,57 @@ class Inventario:
         Retorna: True si se agrego correctamente, False si hubo error
         """
         # Validar que el ID no este repetido
-        # Recorrer la lista de productos
         for producto in self._productos:
-            # Si encontramos un producto con el mismo ID
             if producto.obtener_id() == id_producto:
-                # Mostrar error
                 print(f"Error: El ID {id_producto} ya existe en el inventario.")
                 return False
         
-        # Si el ID no existe, crear el nuevo producto
+        # Crear el nuevo producto
         nuevo_producto = Producto(id_producto, nombre, cantidad, precio)
         
         # Agregar el producto a la lista
         self._productos.append(nuevo_producto)
         
-        # Mensaje de confirmacion
-        print(f"Producto '{nombre}' agregado correctamente al inventario.")
-        return True
+        # CAMBIO: Guardar en archivo
+        if self._guardar_en_archivo():
+            print(f"Producto '{nombre}' agregado correctamente al inventario y guardado en archivo.")
+            return True
+        else:
+            # Si no se pudo guardar, eliminar el producto que agregamos
+            self._productos.remove(nuevo_producto)
+            print(f"Error: No se pudo guardar '{nombre}' en el archivo.")
+            return False
     
     
     def eliminar_producto(self, id_producto):
         """
         Metodo para eliminar un producto del inventario por ID.
         
+        CAMBIO: Actualiza el archivo automaticamente.
+        
         Parametro:
         - id_producto: ID del producto a eliminar (integer)
         
         Retorna: True si se elimino, False si no existe
         """
-        # Recorrer la lista de productos
+        # Buscar el producto
         for i, producto in enumerate(self._productos):
-            # Si encontramos el producto con ese ID
             if producto.obtener_id() == id_producto:
                 # Guardar el nombre antes de eliminar
                 nombre_eliminado = producto.obtener_nombre()
                 
-                # Eliminar el producto de la lista
-                # pop() elimina en la posicion i
+                # Eliminar el producto
                 self._productos.pop(i)
                 
-                # Mensaje de confirmacion
-                print(f"Producto '{nombre_eliminado}' eliminado del inventario.")
-                return True
+                # CAMBIO: Guardar en archivo
+                if self._guardar_en_archivo():
+                    print(f"Producto '{nombre_eliminado}' eliminado del inventario y actualizado en archivo.")
+                    return True
+                else:
+                    # Si no se pudo guardar, restaurar el producto
+                    self._productos.insert(i, producto)
+                    print(f"Error: No se pudo actualizar el archivo.")
+                    return False
         
         # Si no encuentra el producto
         print(f"Error: No existe producto con ID {id_producto}.")
@@ -96,21 +146,27 @@ class Inventario:
         """
         Metodo para actualizar la cantidad de un producto.
         
+        CAMBIO: Guarda los cambios en el archivo.
+        
         Parametros:
         - id_producto: ID del producto a actualizar (integer)
         - nueva_cantidad: la nueva cantidad (integer)
         
         Retorna: True si se actualizo, False si no existe
         """
-        # Buscar el producto por ID
+        # Buscar el producto
         for producto in self._productos:
             if producto.obtener_id() == id_producto:
-                # Usar el setter para cambiar la cantidad
-                # El setter valida que sea positiva
+                # Cambiar la cantidad
                 producto.establecer_cantidad(nueva_cantidad)
                 
-                print(f"Cantidad del producto ID {id_producto} actualizada a {nueva_cantidad}.")
-                return True
+                # CAMBIO: Guardar en archivo
+                if self._guardar_en_archivo():
+                    print(f"Cantidad del producto ID {id_producto} actualizada a {nueva_cantidad} y guardada en archivo.")
+                    return True
+                else:
+                    print(f"Error: No se pudo guardar los cambios en el archivo.")
+                    return False
         
         # Si no encuentra el producto
         print(f"Error: No existe producto con ID {id_producto}.")
@@ -121,21 +177,27 @@ class Inventario:
         """
         Metodo para actualizar el precio de un producto.
         
+        CAMBIO: Guarda los cambios en el archivo.
+        
         Parametros:
         - id_producto: ID del producto a actualizar (integer)
         - nuevo_precio: el nuevo precio (float)
         
         Retorna: True si se actualizo, False si no existe
         """
-        # Buscar el producto por ID
+        # Buscar el producto
         for producto in self._productos:
             if producto.obtener_id() == id_producto:
-                # Usar el setter para cambiar el precio
-                # El setter valida que sea positivo
+                # Cambiar el precio
                 producto.establecer_precio(nuevo_precio)
                 
-                print(f"Precio del producto ID {id_producto} actualizado a ${nuevo_precio:.2f}.")
-                return True
+                # CAMBIO: Guardar en archivo
+                if self._guardar_en_archivo():
+                    print(f"Precio del producto ID {id_producto} actualizado a {nuevo_precio} y guardado en archivo.")
+                    return True
+                else:
+                    print(f"Error: No se pudo guardar los cambios en el archivo.")
+                    return False
         
         # Si no encuentra el producto
         print(f"Error: No existe producto con ID {id_producto}.")
@@ -146,23 +208,20 @@ class Inventario:
         """
         Metodo para buscar productos por nombre.
         
+        CARACTERISTICA: Permite coincidencias parciales.
+        
         Parametro:
         - nombre_busqueda: nombre (o parte del nombre) a buscar (string)
         
         Retorna: lista con los productos encontrados
         """
-        # Lista para guardar los resultados
         resultados = []
         
-        # Recorrer la lista de productos
         for producto in self._productos:
-            # Obtener el nombre del producto
             nombre_producto = producto.obtener_nombre()
             
-            # Convertir ambos a minusculas para ignorar mayusculas/minusculas
-            # Verificar si el nombre buscado esta contenido en el nombre del producto
+            # Buscar coincidencias sin importar mayusculas/minusculas
             if nombre_busqueda.lower() in nombre_producto.lower():
-                # Agregar a resultados
                 resultados.append(producto)
         
         return resultados
@@ -177,43 +236,31 @@ class Inventario:
         
         Retorna: el objeto Producto si existe, None si no existe
         """
-        # Recorrer la lista de productos
         for producto in self._productos:
-            # Si encontramos el producto
             if producto.obtener_id() == id_producto:
                 return producto
         
-        # Si no existe, retorna None
         return None
     
     
     def listar_todos_productos(self):
         """
         Metodo para mostrar todos los productos del inventario.
-        
-        Imprime informacion de todos los productos de forma
-        ordenada y facil de leer.
         """
-        # Verificar si hay productos
         if len(self._productos) == 0:
             print("\nEl inventario esta vacio.")
             return
         
-        # Mostrar encabezado
         print("\n" + "=" * 70)
         print("INVENTARIO COMPLETO")
         print("=" * 70)
         
-        # Variable para enumerar
         numero = 1
         
-        # Recorrer y mostrar cada producto
         for producto in self._productos:
-            # Mostrar la informacion
             print(f"{numero}. {producto.obtener_informacion_texto()}")
             numero += 1
         
-        # Mostrar cantidad total
         print("=" * 70)
         print(f"Total de productos en el inventario: {len(self._productos)}")
         print("=" * 70)
@@ -236,16 +283,12 @@ class Inventario:
         
         Retorna: valor total en dinero (float)
         """
-        # Variable para acumular el total
         total = 0
         
-        # Recorrer cada producto
         for producto in self._productos:
-            # Obtener cantidad y precio
             cantidad = producto.obtener_cantidad()
             precio = producto.obtener_precio()
             
-            # Agregar al total: cantidad * precio
             total += cantidad * precio
         
         return total
